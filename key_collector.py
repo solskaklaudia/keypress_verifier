@@ -4,20 +4,21 @@ import time
 def calcParameters(keys):
     
     print(keys)
-    print("average key hold time: " + str(calcAvgHoldTime(keys)) + " s")
-    print("average time between key presses: " + str(calcTimeBetwenKeyPress(keys)) + " s")
-    print("average typing speed: " + str(calcTypingSpeed(keys)) + " 1/min")
-    print("average number of errors: " + str(countErrors(keys)) + " 1/min")
-    print("average time between key combinations: " + str(calcTimeBetweenCombinations(keys)) + " s")
+    print("average key hold time: " + str(calcAvgHoldTime(keys)) + " ms")
+    print("average time between key presses: " + str(calcTimeBetwenKeyPress(keys)) + " ms")
+    print("average time between key combinations: " + str(calcTimeBetweenCombinations(keys)) + " ms")
+    print("average typing speed: " + str(calcTypingSpeed(keys)) + " keys/min")
+    print("average number of errors: " + str(countErrors(keys)) + " keys/min")
 
 
 """ Sorting """
 
+# sorting by key first (letter size invariant) and time second
 def sortFunc1(e):
     key = str(e["key"]).lower()
     return key, e["time"]
 
-
+# sorting by time
 def sortFunc2(e):
     return e["time"]
 
@@ -25,10 +26,11 @@ def sortFunc2(e):
 """ Calculate typing parameters """
 
 def calcAvgHoldTime(keys):
+    """ Calculates average time of holding a key (difference between press and release of a key) """
 
     keys.sort(key=sortFunc1)
 
-    avg_hold_time = 0   # in seconds
+    avg_hold_time = 0
     temp = 0
 
     for k in range(len(keys)):
@@ -38,16 +40,17 @@ def calcAvgHoldTime(keys):
             avg_hold_time += keys[k]["time"] - temp
 
     if(len(keys) > 0):
-        avg_hold_time = avg_hold_time / len(keys) / 2
+        avg_hold_time = avg_hold_time / (len(keys)/2)
 
-    return avg_hold_time
+    return avg_hold_time * 1000
 
 
 def calcTimeBetwenKeyPress(keys):
+    """ Calculates average time between key presses """
 
     keys.sort(key=sortFunc2)
 
-    avg_time_between_key_press = 0 # in seconds
+    avg_time_between_key_press = 0
     temp = 0
     key_counter = 0
 
@@ -57,9 +60,9 @@ def calcTimeBetwenKeyPress(keys):
             if(k > 0):
                 time = keys[k]["time"] - temp
 
-                # save only times less than 1 seconds
+                # save only times less than 3 seconds
                 # to avoid counting pauses in typing
-                if(time < 1.0):
+                if(time < 3.0):
                     avg_time_between_key_press += time
                     key_counter += 1
 
@@ -68,65 +71,14 @@ def calcTimeBetwenKeyPress(keys):
     if(key_counter > 0):
         avg_time_between_key_press = avg_time_between_key_press / key_counter
 
-    return avg_time_between_key_press
-        
-
-def calcTypingSpeed(keys):
-
-    keys.sort(key=sortFunc2)
-
-    avg_typing_speed = 0    # number of keys per minute
-    time_sum = 0            # in seconds
-    temp = 0
-
-    for k in range(len(keys)):
-            
-        if(k > 0):
-            time = keys[k]["time"] - temp
-
-            # save only times less than 1 seconds
-            # to avoid counting pauses in typing
-            if(time < 1.0):
-                time_sum += time
-
-        temp = keys[k]["time"]
-
-    if(time_sum > 0):
-        avg_typing_speed = len(keys) / time_sum * 60
-
-    return avg_typing_speed
-
-
-def countErrors(keys):
-
-    keys.sort(key=sortFunc2)
-
-    time_sum = 0 # in seconds
-    temp = 0
-    errors = 0
-
-    for k in range(len(keys)):
-            
-        if(k > 0):
-            time = keys[k]["time"] - temp
-
-            # save only times less than 1 seconds
-            # to avoid counting pauses in typing
-            if(time < 1.0):
-                time_sum += time
-
-        temp = keys[k]["time"]
-
-        if(keys[k]["status"] == "pressed" and (keys[k]["key"] == Key.backspace or keys[k]["key"] == Key.delete)):
-            errors += 1
-
-    if(time_sum > 0):
-        avg_errors = errors / time_sum * 60
-
-    return avg_errors
+    return avg_time_between_key_press * 1000
 
 
 def calcTimeBetweenCombinations(keys):
+    """ Calculates average time between pressing another key in key combination 
+    eg. between pressing `Ctrl` and `C` """
+
+    keys.sort(key=sortFunc2)
 
     counter = 0
     avg_time = 0
@@ -141,7 +93,68 @@ def calcTimeBetweenCombinations(keys):
     if(counter > 0):
         avg_time = avg_time / counter
 
-    return counter
+    return avg_time * 1000
+
+
+def calcTypingSpeed(keys):
+    """ Calculates average numbers of keys pressed per minute
+    excluding pauses longer than 3 seconds"""
+
+    keys.sort(key=sortFunc2)
+
+    avg_typing_speed = 0
+    time_sum = 0
+    temp = 0
+    key_counter = 0
+
+    for k in range(len(keys)):
+            
+        if(keys[k]["status"] == "pressed"):
+            if(k > 0):
+                time = keys[k]["time"] - temp
+
+                # save only times less than 3 seconds
+                # to avoid counting pauses in typing
+                if(time < 3.0):
+                    time_sum += time      
+
+            temp = keys[k]["time"]
+            key_counter += 1
+
+    if(time_sum > 0):
+        avg_typing_speed = key_counter / time_sum * 60
+
+    return avg_typing_speed
+
+
+def countErrors(keys):
+    """ Counts errors (number of `backspace` or `delete` keys pressed) per minute """
+
+    keys.sort(key=sortFunc2)
+
+    time_sum = 0
+    temp = 0
+    errors = 0
+
+    for k in range(len(keys)):
+            
+        if(k > 0):
+            time = keys[k]["time"] - temp
+
+            # save only times less than 3 seconds
+            # to avoid counting pauses in typing
+            if(time < 3.0):
+                time_sum += time
+
+        temp = keys[k]["time"]
+
+        if(keys[k]["status"] == "pressed" and (keys[k]["key"] == Key.backspace or keys[k]["key"] == Key.delete)):
+            errors += 1
+
+    if(time_sum > 0):
+        avg_errors = errors / time_sum * 60
+
+    return avg_errors
 
 
 """ Detecting keys """
