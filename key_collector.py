@@ -1,12 +1,16 @@
 from pynput.keyboard import Key, Listener
 import time
+import statistics as st
 
 def calcParameters(keys):
     
     print(keys)
-    print("average key hold time: " + str(calcAvgHoldTime(keys)) + " ms")
-    print("average time between key presses: " + str(calcTimeBetwenKeyPress(keys)) + " ms")
-    print("average time between key combinations: " + str(calcTimeBetweenCombinations(keys)) + " ms")
+    hold_time = calcAvgHoldTime(keys)
+    press_time = calcTimeBetwenKeyPress(keys)
+    combinations_time = calcTimeBetweenCombinations(keys)
+    print("average key hold time: " + str(hold_time[0]) + " +/- " + str(hold_time[1]) + " ms")
+    print("average time between key presses: " + str(press_time[0]) + " +/- " + str(press_time[1]) + " ms")
+    print("average time between key combinations: " + str(combinations_time[0]) + " +/- " + str(combinations_time[1]) + " ms")
     print("average typing speed: " + str(calcTypingSpeed(keys)) + " keys/min")
     print("average number of errors: " + str(countErrors(keys)) + " keys/min")
 
@@ -30,6 +34,8 @@ def calcAvgHoldTime(keys):
 
     keys.sort(key=sortFunc1)
 
+    samples = []
+
     avg_hold_time = 0
     temp = 0
 
@@ -37,18 +43,25 @@ def calcAvgHoldTime(keys):
         if k%2 == 0:
             temp = keys[k]["time"]
         else: 
-            avg_hold_time += keys[k]["time"] - temp
+            sample = keys[k]["time"] - temp
+            samples.append(sample)
+            avg_hold_time += sample
 
     if(len(keys) > 0):
         avg_hold_time = avg_hold_time / (len(keys)/2)
 
-    return avg_hold_time * 1000
+    # standard deviation
+    stdev = st.stdev(samples)
+
+    return (avg_hold_time * 1000, stdev * 1000)
 
 
 def calcTimeBetwenKeyPress(keys):
     """ Calculates average time between key presses """
 
     keys.sort(key=sortFunc2)
+
+    samples = []
 
     avg_time_between_key_press = 0
     temp = 0
@@ -65,13 +78,17 @@ def calcTimeBetwenKeyPress(keys):
                 if(time < 3.0):
                     avg_time_between_key_press += time
                     key_counter += 1
+                    samples.append(time)
 
             temp = keys[k]["time"]
 
     if(key_counter > 0):
         avg_time_between_key_press = avg_time_between_key_press / key_counter
 
-    return avg_time_between_key_press * 1000
+    # standard deviation
+    stdev = st.stdev(samples)
+
+    return (avg_time_between_key_press * 1000, stdev * 1000)
 
 
 def calcTimeBetweenCombinations(keys):
@@ -80,6 +97,8 @@ def calcTimeBetweenCombinations(keys):
 
     keys.sort(key=sortFunc2)
 
+    samples = []
+
     counter = 0
     avg_time = 0
 
@@ -87,13 +106,18 @@ def calcTimeBetweenCombinations(keys):
 
         if(k < len(keys) - 1):
             if(keys[k]["status"] == "pressed" and keys[k+1]["status"] == "pressed"):
-                avg_time += keys[k+1]["time"] - keys[k]["time"]
+                sample = keys[k+1]["time"] - keys[k]["time"]
+                samples.append(sample)
+                avg_time += sample
                 counter += 1
         
     if(counter > 0):
         avg_time = avg_time / counter
 
-    return avg_time * 1000
+    # standard deviation
+    stdev = st.stdev(samples)
+
+    return (avg_time * 1000, stdev * 1000)
 
 
 def calcTypingSpeed(keys):
